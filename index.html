@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EIXO: A Guerra das Memórias — Sistema de Acesso</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./assets/css/style.css">
+    <!-- Particles.js -->
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <!-- Efeito de partículas -->
+    <div id="particles-js"></div>
+    <div class="scanlines"></div>
+    
+    <!-- Header -->
+    <header class="eixo-header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon"></div>
+                <div class="logo-text">
+                    <h1 class="glitch" data-text="EIXO">EIXO</h1>
+                    <p class="subtitle">A Guerra das Memórias</p>
+                </div>
+            </div>
+            <div class="status-indicator">
+                <span class="status-dot active"></span>
+                <span class="status-text">SISTEMA ONLINE</span>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Container Principal -->
+    <div class="container">
+        <!-- Card de Login -->
+        <div class="auth-card" id="loginCard">
+            <div class="auth-header">
+                <h2><i class="fas fa-terminal"></i> ACESSO AO SISTEMA EIXO</h2>
+                <p>Nível de segurança: 3 | Protocolo E-317 em vigor</p>
+            </div>
+            
+            <div id="message" class="message" style="display: none;"></div>
+            
+            <div class="input-group">
+                <label for="email"><i class="fas fa-id-card"></i> IDENTIFICAÇÃO</label>
+                <input type="email" id="email" class="input-field" placeholder="agente@eixo.gov.br" autocomplete="username">
+            </div>
+            
+            <div class="input-group">
+                <label for="password"><i class="fas fa-key"></i> SENHA DE ACESSO</label>
+                <input type="password" id="password" class="input-field" placeholder="••••••••" autocomplete="current-password">
+            </div>
+            
+            <button onclick="login()" class="btn btn-primary">
+                <i class="fas fa-sign-in-alt"></i> INICIAR SESSÃO
+            </button>
+            
+            <button onclick="showRegister()" class="btn btn-secondary">
+                <i class="fas fa-user-plus"></i> NOVO AGENTE
+            </button>
+            
+            <div class="auth-switch">
+                <span>Primeiro acesso? </span>
+                <a onclick="showRegister()">Registrar nova identidade</a>
+            </div>
+            
+            <!-- Terminal de Status -->
+            <div class="terminal">
+                <div class="terminal-line">> Inicializando sistema EIXO...</div>
+                <div class="terminal-line">> Verificando credenciais...</div>
+                <div class="terminal-line">> Sistema de memória: OPERACIONAL</div>
+                <div class="terminal-line" id="terminalStatus">> Aguardando autenticação...</div>
+            </div>
+        </div>
+        
+        <!-- Card de Registro (hidden) -->
+        <div class="auth-card" id="registerCard" style="display: none;">
+            <div class="auth-header">
+                <h2><i class="fas fa-user-secret"></i> REGISTRO DE AGENTE</h2>
+                <p>Criação de nova identidade no Sistema EIXO</p>
+            </div>
+            
+            <div id="regMessage" class="message" style="display: none;"></div>
+            
+            <div class="input-group">
+                <label for="username"><i class="fas fa-user"></i> NOME/CODINOME</label>
+                <input type="text" id="username" class="input-field" placeholder="Ex: Agente Silva ou FANTASMA-317" maxlength="20">
+            </div>
+            
+            <div class="input-group">
+                <label for="regEmail"><i class="fas fa-envelope"></i> E-MAIL INSTITUCIONAL</label>
+                <input type="email" id="regEmail" class="input-field" placeholder="seu.email@dominio.gov.br">
+            </div>
+            
+            <div class="input-group">
+                <label for="regPassword"><i class="fas fa-lock"></i> SENHA</label>
+                <input type="password" id="regPassword" class="input-field" placeholder="Mínimo 6 caracteres">
+            </div>
+            
+            <div class="input-group">
+                <label for="confirmPassword"><i class="fas fa-lock"></i> CONFIRMAR SENHA</label>
+                <input type="password" id="confirmPassword" class="input-field" placeholder="Digite novamente a senha">
+            </div>
+            
+            <button onclick="register()" class="btn btn-primary">
+                <i class="fas fa-fingerprint"></i> CRIAR IDENTIDADE
+            </button>
+            
+            <button onclick="showLogin()" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> VOLTAR AO LOGIN
+            </button>
+            
+            <div class="auth-switch">
+                <span>Já possui identidade? </span>
+                <a onclick="showLogin()">Acessar sistema</a>
+            </div>
+            
+            <!-- Aviso de Segurança -->
+            <div class="terminal">
+                <div class="terminal-line">> ATENÇÃO: Sistema de classificação NÍVEL 3</div>
+                <div class="terminal-line">> Todas as ações são monitoradas</div>
+                <div class="terminal-line">> Progresso salvo automaticamente</div>
+                <div class="terminal-line">> O Eixo observa</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="eixo-footer">
+        <div class="footer-content">
+            <p>Sistema EIXO v1.0 | Protocolo E-317 | Acesso restrito</p>
+            <p class="warning">⚠️ Toda atividade é registrada e auditada</p>
+        </div>
+    </footer>
+    
+    <!-- Scripts -->
+    <script src="firebase-config.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+        // Configurar partículas
+        particlesJS('particles-js', {
+            particles: {
+                number: { value: 80, density: { enable: true, value_area: 800 } },
+                color: { value: "#00ff9d" },
+                shape: { type: "circle" },
+                opacity: { value: 0.3, random: true },
+                size: { value: 3, random: true },
+                line_linked: {
+                    enable: true,
+                    distance: 150,
+                    color: "#0066ff",
+                    opacity: 0.2,
+                    width: 1
+                },
+                move: {
+                    enable: true,
+                    speed: 2,
+                    direction: "none",
+                    random: true,
+                    straight: false,
+                    out_mode: "out",
+                    bounce: false
+                }
+            },
+            interactivity: {
+                detect_on: "canvas",
+                events: {
+                    onhover: { enable: true, mode: "repulse" },
+                    onclick: { enable: true, mode: "push" }
+                }
+            }
+        });
+        
+        // Verificar se já está logado
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user && window.location.pathname.endsWith('index.html')) {
+                updateTerminal("> Sessão anterior detectada...");
+                setTimeout(() => {
+                    updateTerminal("> Redirecionando para continuar...");
+                    setTimeout(() => {
+                        window.location.href = 'game.html';
+                    }, 1500);
+                }, 1000);
+            }
+        });
+        
+        function updateTerminal(text) {
+            const terminalStatus = document.getElementById('terminalStatus');
+            if (terminalStatus) {
+                terminalStatus.textContent = text;
+            }
+        }
+    </script>
+</body>
+</html>

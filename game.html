@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EIXO: A Guerra das Memórias — Em Andamento</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./assets/css/style.css">
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <!-- Efeitos visuais -->
+    <div id="particles-js"></div>
+    <div class="scanlines"></div>
+    
+    <!-- Header do Jogo -->
+    <header class="eixo-header">
+        <div class="header-content">
+            <div class="logo" onclick="loadScene('prologo')" style="cursor: pointer;">
+                <div class="logo-icon"></div>
+                <div class="logo-text">
+                    <h1 class="glitch" data-text="EIXO">EIXO</h1>
+                    <p class="subtitle">A Guerra das Memórias</p>
+                </div>
+            </div>
+            
+            <div class="game-info">
+                <div class="info-item">
+                    <i class="fas fa-user-secret"></i>
+                    <span id="playerName">Carregando...</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-clock"></i>
+                    <span id="gameTime">02:37</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-save"></i>
+                    <span id="saveStatus">Auto-save: ON</span>
+                </div>
+                <button onclick="logout()" class="btn-logout">
+                    <i class="fas fa-sign-out-alt"></i> SAIR
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Container do Jogo -->
+    <main class="container">
+        <div id="game-content" class="game-content">
+            <!-- Conteúdo será carregado aqui -->
+            <div class="loading-screen">
+                <div class="spinner"></div>
+                <p>Inicializando Protocolo E-317...</p>
+                <div class="terminal">
+                    <div class="terminal-line">> Verificando credenciais do agente...</div>
+                    <div class="terminal-line">> Carregando módulos do sistema...</div>
+                    <div class="terminal-line">> Acessando memórias arquivadas...</div>
+                    <div class="terminal-line" id="loadStatus">> Aguarde...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Footer do Jogo -->
+    <footer class="eixo-footer">
+        <div class="footer-content">
+            <div class="status-indicators">
+                <div class="indicator">
+                    <span class="indicator-label">CONEXÃO COM EIXO</span>
+                    <div class="indicator-bar">
+                        <div class="indicator-fill" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+            <p class="warning">⚠️ Sistema de auto-save ativo | Todas as ações são registradas</p>
+            <div class="version">Protocolo E-317 | Versão 1.0</div>
+        </div>
+    </footer>
+    
+    <!-- Scripts principais -->
+    <script src="firebase-config.js"></script>
+    <script>
+        // Configurar partículas
+        particlesJS('particles-js', {
+            particles: {
+                number: { value: 60, density: { enable: true, value_area: 800 } },
+                color: { value: "#00ff9d" },
+                shape: { type: "circle" },
+                opacity: { value: 0.2, random: true },
+                size: { value: 2, random: true },
+                line_linked: {
+                    enable: true,
+                    distance: 120,
+                    color: "#9d00ff",
+                    opacity: 0.1,
+                    width: 1
+                },
+                move: {
+                    enable: true,
+                    speed: 1.5,
+                    direction: "none",
+                    random: true,
+                    straight: false,
+                    out_mode: "out",
+                    bounce: false
+                }
+            }
+        });
+        
+        // Estado global do jogo
+        const gameState = {
+            currentScene: 'prologo',
+            playerName: 'Agente',
+            player: null,
+            hora: '02:37',
+            dia: 1,
+            estabilidadeEixo: 7,
+            conscienciaPublica: 2,
+            influenciaYango: 1,
+            integridadeMoral: 0,
+            escolhas: []
+        };
+        
+        // Cache para as cenas carregadas
+        let scenesCache = {};
+        
+        // ============================================
+        // FUNÇÕES PRINCIPAIS CORRIGIDAS
+        // ============================================
+        
+        // Função para mostrar notificação
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            
+            const icon = type === 'success' ? 'check' : 
+                         type === 'error' ? 'times' : 
+                         type === 'warning' ? 'exclamation' : 'info';
+            
+            notification.innerHTML = `<i class="fas fa-${icon}"></i> ${message}`;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 3000);
+        }
+        
+        // Verificar autenticação
+        firebase.auth().onAuthStateChanged(async (user) => {
+            const loadStatus = document.getElementById('loadStatus');
+            
+            if (user) {
+                gameState.player = user;
+                if (loadStatus) {
+                    loadStatus.textContent = "> Agente autenticado: " + user.email;
+                }
+                
+                const displayName = user.email.split('@')[0];
+                document.getElementById('playerName').textContent = displayName;
+                gameState.playerName = displayName;
+                
+                // Carregar dados do usuário
+                try {
+                    const userDoc = await firebase.firestore().collection('agentes').doc(user.uid).get();
+                    if (userDoc.exists) {
+                        const data = userDoc.data();
+                        if (data.username) {
+                            document.getElementById('playerName').textContent = data.username;
+                            gameState.playerName = data.username;
+                        }
+                    }
+                } catch (error) {
+                    console.error("Erro ao carregar dados:", error);
+                }
+                
+                // Carregar save do jogador
+                await loadPlayerSave();
+                
+                // Iniciar auto-save
+                startAutoSave();
+                
+                // Carregar primeira cena
+                setTimeout(() => {
+                    loadScene(gameState.currentScene);
+                }, 1000);
+                
+            } else {
+                if (loadStatus) {
+                    loadStatus.textContent = "> Nenhuma sessão ativa. Redirecionando...";
+                }
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+            }
+        });
+        
+        // Carregar save do jogador
+        async function loadPlayerSave() {
+            const user = firebase.auth().currentUser;
+            if (!user) return;
+            
+            try {
+                const db = firebase.firestore();
+                const saveDoc = await db.collection('saves').doc(user.uid).get();
+                
+                if (saveDoc.exists) {
+                    const data = saveDoc.data();
+                    console.log("✅ Save carregado");
+                    
+                    if (data.ultimaCena) {
+                        gameState.currentScene = data.ultimaCena;
+                    }
+                    if (data.estadoJogo) {
+                        Object.assign(gameState, data.estadoJogo);
+                    }
+                    
+                    showNotification('Memória restaurada do Eixo', 'success');
+                } else {
+                    console.log("⚠️ Nenhum save encontrado");
+                }
+            } catch (error) {
+                console.error("❌ Erro ao carregar save:", error);
+            }
+        }
+        
+        // ============================================
+        // SISTEMA DE CENAS PRINCIPAL - CORRIGIDO
+        // ============================================
+        
+        async function loadScene(sceneName) {
+            console.log("🔄 Carregando cena:", sceneName);
+            
+            const container = document.getElementById('game-content');
+            
+            if (!container) {
+                console.error("❌ Container não encontrado!");
+                return;
+            }
+            
+            try {
+                // Atualizar estado
+                gameState.currentScene = sceneName;
+                
+                // Salvar progresso
+                await saveProgress();
+                
+                let sceneContent = '';
+                
+                // VERIFICAR DE ONDE PEGAR O CONTEÚDO
+                if (sceneName === 'prologo') {
+                    sceneContent = getPrologoContent();
+                } 
+                else if (sceneName.startsWith('ato1_')) {
+                    // Carregar dinamicamente do ato1.js
+                    sceneContent = await loadAto1Scene(sceneName);
+                }
+                else if (sceneName.startsWith('final_')) {
+                    sceneContent = getFinalContent(sceneName);
+                }
+                else {
+                    // Fallback para prólogo
+                    sceneContent = getPrologoContent();
+                }
+                
+                // Aplicar nome do jogador
+                if (sceneContent) {
+                    sceneContent = sceneContent.replace(/\[NOME_DO_JOGADOR\]/g, gameState.playerName);
+                }
+                
+                // Atualizar container
+                container.innerHTML = sceneContent;
+                
+                // Scroll para topo
+                window.scrollTo(0, 0);
+                
+                console.log("✅ Cena renderizada:", sceneName);
+                
+            } catch (error) {
+                console.error("❌ Erro ao carregar cena:", error);
+                container.innerHTML = `
+                    <div class="error-screen">
+                        <h2><i class="fas fa-exclamation-triangle"></i> ERRO DO SISTEMA</h2>
+                        <p>Falha ao carregar a cena ${sceneName}.</p>
+                        <p><small>${error.message}</small></p>
+                        <button onclick="loadScene('prologo')" class="btn btn-secondary">
+                            <i class="fas fa-redo"></i> VOLTAR AO INÍCIO
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
+        // Função corrigida para carregar cenas do ato1.js
+        async function loadAto1Scene(sceneName) {
+            console.log("📥 Tentando carregar:", sceneName);
+            
+            // Se já temos no cache, usar do cache
+            if (scenesCache[sceneName]) {
+                console.log("📂 Usando cena do cache:", sceneName);
+                return scenesCache[sceneName];
+            }
+            
+            try {
+                // Carregar dinamicamente o módulo
+                console.log("📥 Carregando módulo ato1.js...");
+                
+                // Tente diferentes caminhos
+                let module;
+                try {
+                    module = await import('./scenes/ato1.js');
+                } catch (importError) {
+                    console.error("❌ Erro ao importar:", importError);
+                    // Tenta caminho alternativo
+                    module = await import('/scenes/ato1.js');
+                }
+                
+                // Verificar se a cena existe no módulo
+                if (module && module[sceneName] && module[sceneName].text) {
+                    scenesCache[sceneName] = module[sceneName].text;
+                    console.log("✅ Cena carregada:", sceneName);
+                    return module[sceneName].text;
+                } else {
+                    console.error("❌ Cena não encontrada no módulo:", sceneName);
+                    console.log("📦 Módulo carregado:", Object.keys(module || {}));
+                    throw new Error(`Cena ${sceneName} não encontrada no ato1.js`);
+                }
+            } catch (error) {
+                console.error("❌ Erro ao carregar cena específica:", error);
+                
+                // Fallback: mostrar conteúdo de fallback
+                return `
+                    <div class="scene">
+                        <div class="narrador">
+                            <h2>ERRO TEMPORÁRIO</h2>
+                            <p>O sistema está enfrentando problemas para carregar a cena ${sceneName}.</p>
+                            <p>Por favor, tente novamente ou volte ao início.</p>
+                            <button onclick="loadScene('prologo')" class="btn btn-primary">
+                                <i class="fas fa-home"></i> VOLTAR AO INÍCIO
+                            </button>
+                            <button onclick="debugCenas()" class="btn btn-secondary" style="margin-left: 10px;">
+                                <i class="fas fa-bug"></i> DEBUG
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        // Função de debug
+        function debugCenas() {
+            console.log("🔍 Debug - Estado do jogo:", gameState);
+            console.log("🔍 Debug - Cenas em cache:", Object.keys(scenesCache));
+            console.log("🔍 Debug - Usuário:", firebase.auth().currentUser);
+            alert("Debug: Veja o console (F12) para mais informações.");
+        }
+        
+        // ============================================
+        // CONTEÚDO DAS CENAS LOCAIS
+        // ============================================
+        
+        function getPrologoContent() {
+            return `
+                <div class="scene prologo">
+                    <div class="narrador">
+                        <h1>EIXO: A Guerra das Memórias</h1>
+                        
+                        <div class="text-block">
+                            <p>Brasília não nasceu apenas de concreto.</p>
+                            <p>Entre eixos, asas e monumentos, ergueu-se também algo invisível:<br>
+                            uma máquina paciente, feita de decisões, omissões e memórias arquivadas.</p>
+                            
+                            <p class="destaque">Alguns a chamam de governo.<br>
+                            Outros, de sistema.<br>
+                            Nos documentos mais antigos, porém, ela recebe outro nome: <strong>Eixo</strong>.</p>
+                            
+                            <p>O Eixo não tem rosto.<br>
+                            Ele usa rostos.</p>
+                            
+                            <p>E, quando a verdade é distorcida vezes demais,<br>
+                            a própria realidade começa a falhar.</p>
+                            
+                            <p class="destaque-personagem">É aqui que você entra, <span class="player-name">${gameState.playerName}</span>.<br>
+                            Em um escritório qualquer, em uma madrugada qualquer,<br>
+                            prestes a abrir um arquivo que não deveria existir.</p>
+                        </div>
+                        
+                        <button onclick="loadScene('ato1_cena1')" class="btn btn-primary">
+                            <i class="fas fa-play"></i> INICIAR JORNADA
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function getFinalContent(finalType) {
+            const finais = {
+                'final_a': {
+                    titulo: 'O APAGAMENTO',
+                    descricao: 'Você apagou o documento. O Eixo agradece sua cooperação.',
+                    consequencias: '+2 Estabilidade do Eixo, -1 Integridade Moral'
+                },
+                'final_b': {
+                    titulo: 'O DENUNCIANTE', 
+                    descricao: 'Você denunciou a anomalia. Agora o sistema sabe que você sabe.',
+                    consequencias: '+1 Consciência Pública, -2 Estabilidade do Eixo'
+                },
+                'final_c': {
+                    titulo: 'O INVESTIGADOR',
+                    descricao: 'Você começou a investigar Yango. A anomalia sabe que você está procurando.',
+                    consequencias: '+2 Influência de Yango, +1 Integridade Moral'
+                }
+            };
+            
+            const final = finais[finalType] || finais.final_a;
+            
+            return `
+                <div class="scene final">
+                    <div class="narrador">
+                        <h2>FIM DO ATO I — ${final.titulo}</h2>
+                        
+                        <div class="text-block">
+                            <p>${final.descricao}</p>
+                            
+                            <div class="tela sistema">
+                                <div class="tela-conteudo">
+                                    <h3>RELATÓRIO DE CONSEQUÊNCIAS</h3>
+                                    <p>${final.consequencias}</p>
+                                    <p>Estado atual:</p>
+                                    <ul>
+                                        <li>Estabilidade do Eixo: ${gameState.estabilidadeEixo}/10</li>
+                                        <li>Consciência Pública: ${gameState.conscienciaPublica}/10</li>
+                                        <li>Influência de Yango: ${gameState.influenciaYango}/10</li>
+                                        <li>Sua Integridade Moral: ${gameState.integridadeMoral}/5</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <p class="destaque">O Eixo observa. Suas ações serão lembradas.</p>
+                        </div>
+                        
+                        <div style="margin-top: 30px;">
+                            <button onclick="loadScene('prologo')" class="btn btn-primary">
+                                <i class="fas fa-redo"></i> JOGAR NOVAMENTE
+                            </button>
+                            <button onclick="salvarEVoltar()" class="btn btn-secondary" style="margin-left: 10px;">
+                                <i class="fas fa-home"></i> SALVAR E SAIR
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // ============================================
+        // PROCESSAMENTO DE ESCOLHAS
+        // ============================================
+        
+        function processarEscolha(opcao) {
+            console.log("🎯 Processando escolha:", opcao);
+            showNotification(`Opção ${opcao} registrada`, 'info');
+            
+            // Aplicar consequências
+            switch(opcao) {
+                case 'A':
+                    gameState.estabilidadeEixo += 2;
+                    gameState.integridadeMoral -= 1;
+                    gameState.escolhas.push('A');
+                    showNotification('Documento apagado. O Eixo agradece.', 'success');
+                    setTimeout(() => {
+                        saveProgress();
+                        loadScene('final_a');
+                    }, 1000);
+                    break;
+                    
+                case 'B':
+                    gameState.conscienciaPublica += 1;
+                    gameState.estabilidadeEixo -= 2;
+                    gameState.escolhas.push('B');
+                    showNotification('Denúncia registrada. O sistema está ciente.', 'warning');
+                    setTimeout(() => {
+                        saveProgress();
+                        loadScene('final_b');
+                    }, 1000);
+                    break;
+                    
+                case 'C':
+                    gameState.influenciaYango += 2;
+                    gameState.integridadeMoral += 1;
+                    gameState.escolhas.push('C');
+                    showNotification('Investigação iniciada. Yango sabe que você o procura.', 'info');
+                    setTimeout(() => {
+                        saveProgress();
+                        loadScene('final_c');
+                    }, 1000);
+                    break;
+            }
+        }
+        
+        // ============================================
+        // SISTEMA DE SALVAMENTO
+        // ============================================
+        
+        async function saveProgress() {
+            const user = firebase.auth().currentUser;
+            if (!user) return false;
+            
+            try {
+                const db = firebase.firestore();
+                await db.collection('saves').doc(user.uid).set({
+                    estadoJogo: {
+                        currentScene: gameState.currentScene,
+                        playerName: gameState.playerName,
+                        hora: gameState.hora,
+                        dia: gameState.dia,
+                        estabilidadeEixo: gameState.estabilidadeEixo,
+                        conscienciaPublica: gameState.conscienciaPublica,
+                        influenciaYango: gameState.influenciaYango,
+                        integridadeMoral: gameState.integridadeMoral,
+                        escolhas: gameState.escolhas
+                    },
+                    jogador: {
+                        nome: gameState.playerName,
+                        email: user.email
+                    },
+                    salvoEm: firebase.firestore.FieldValue.serverTimestamp(),
+                    ultimaCena: gameState.currentScene
+                });
+                
+                console.log("💾 Progresso salvo");
+                return true;
+            } catch (error) {
+                console.error("❌ Erro ao salvar:", error);
+                return false;
+            }
+        }
+        
+        // Auto-save
+        function startAutoSave(intervalMinutes = 3) {
+            setInterval(() => {
+                if (firebase.auth().currentUser) {
+                    saveProgress();
+                }
+            }, intervalMinutes * 60 * 1000);
+        }
+        
+        // ============================================
+        // FUNÇÕES GLOBAIS
+        // ============================================
+        
+        // Tornar as funções globais
+        window.loadScene = loadScene;
+        window.avancarCena = function(cenaId) {
+            loadScene(cenaId);
+        };
+        window.escolherOpcao = function(opcao) {
+            processarEscolha(opcao);
+        };
+        window.debugCenas = debugCenas;
+        
+        window.salvarEVoltar = async function() {
+            await saveProgress();
+            window.location.href = 'index.html';
+        };
+        
+        window.logout = async function() {
+            try {
+                await saveProgress();
+                await firebase.auth().signOut();
+                window.location.href = 'index.html';
+            } catch (error) {
+                console.error("Erro ao sair:", error);
+                showNotification('Erro ao sair do sistema', 'error');
+            }
+        };
+        
+        // Salvar antes de sair da página
+        window.addEventListener('beforeunload', async (e) => {
+            if (firebase.auth().currentUser) {
+                await saveProgress();
+            }
+        });
+        
+        // Debug helper
+        window.debugState = function() {
+            console.log("🔍 Estado do jogo:", gameState);
+            console.log("📂 Cenas em cache:", Object.keys(scenesCache));
+        };
+        
+    </script>
+</body>
+</html>
